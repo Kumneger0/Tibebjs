@@ -1,0 +1,18 @@
+[project]
+name = "jsruntime"
+version = "0.1.0"
+
+[build]
+command = "go build -o jsruntime cmd/main.go"
+output_dir = "./bin"
+
+[run]
+command = "jsruntime"
+args = ["--v8"]
+
+[watch]
+exclude = ["**/vendor/**", "**/.git/**"]
+
+[env]
+GO111MODULE = "on"
+GOPROXY = "https://proxy.golang.org,direct"
