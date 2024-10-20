@@ -2,14 +2,12 @@ package runtime
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"github.com/evanw/esbuild/pkg/api"
 	fileSystem "github.com/kumneger0/tibebjs/pkg/fs"
 	console "github.com/kumneger0/tibebjs/pkg/globals"
-	"github.com/kumneger0/tibebjs/pkg/modules"
 	v8 "rogchap.com/v8go"
 )
 
@@ -33,7 +31,7 @@ func TransformScript(entryFilePath string) (string, error) {
 				Name: "inject-dirname-filename",
 				Setup: func(build api.PluginBuild) {
 					build.OnLoad(api.OnLoadOptions{Filter: ".*"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
-						fileContent, err := ioutil.ReadFile(args.Path)
+						fileContent, err := os.ReadFile(args.Path)
 						if err != nil {
 							return api.OnLoadResult{}, err
 						}
@@ -95,14 +93,7 @@ func (r *Runtime) SetupGlobals(scriptDir string) error {
 		return fmt.Errorf("error setting console object: %v", err)
 	}
 
-	importFn, err := modules.CreateImportFunction(r.Isolate, scriptDir)
-	if err != nil {
-		return fmt.Errorf("error creating import function: %v", err)
-	}
-	err = global.Set("__import__", importFn)
-	if err != nil {
-		return fmt.Errorf("error setting import function: %v", err)
-	}
+
 
 	return nil
 }
