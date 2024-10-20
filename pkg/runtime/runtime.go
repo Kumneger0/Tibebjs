@@ -2,7 +2,9 @@ package runtime
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/evanw/esbuild/pkg/api"
 	fileSystem "github.com/kumneger0/tibebjs/pkg/fs"
@@ -11,8 +13,6 @@ import (
 	v8 "rogchap.com/v8go"
 )
 
-var ModuleCache = make(map[string]*v8.Value)
-
 type Runtime struct {
 	Isolate *v8.Isolate
 	Context *v8.Context
@@ -20,24 +20,49 @@ type Runtime struct {
 
 func TransformScript(entryFilePath string) (string, error) {
 	result := api.Build(api.BuildOptions{
-		EntryPoints: []string{entryFilePath}, // Entry file (main.js)
-		Bundle:      true,                    // Bundle everything together
-		Write:       false,                   // Do not write to disk
-		Format:      api.FormatIIFE,          // Use IIFE format (immediately invoked function)
-		GlobalName:  "global",                // Name of the global object (optional)
+		EntryPoints: []string{entryFilePath},
+		Bundle:      true,
+		Write:       false,
+		Format:      api.FormatIIFE,
+		GlobalName:  "global",
 		LogLevel:    api.LogLevelInfo,
-		Platform:    api.PlatformNode, // Simulate Node.js environment
-		Target:      api.ESNext,       // Target latest JS
+		Platform:    api.PlatformNode,
+		Target:      api.ESNext,
+			Plugins: []api.Plugin{
+			{
+				Name: "inject-dirname-filename",
+				Setup: func(build api.PluginBuild) {
+					build.OnLoad(api.OnLoadOptions{Filter: ".*"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
+						fileContent, err := ioutil.ReadFile(args.Path)
+						if err != nil {
+							return api.OnLoadResult{}, err
+						}
+						dirPath := filepath.Dir(args.Path)
+						fileName, err := filepath.Abs(args.Path)
+						if err != nil {
+							return api.OnLoadResult{}, err
+						}
+
+						injectedContent := fmt.Sprintf(`
+							const __dirname = %q;
+							const __filename = %q;
+							%s
+						`, dirPath, fileName, string(fileContent))
+
+						return api.OnLoadResult{
+							Contents:   &injectedContent,
+							ResolveDir: dirPath,
+						}, nil
+					})
+				},
+			},
+		},
 	})
 
-	// Check if esbuild encountered any errors
 	if len(result.Errors) > 0 {
 		return "", fmt.Errorf("error during esbuild transformation: %v", result.Errors)
 	}
-
-	// Extract the transformed/bundled code
 	bundledCode := string(result.OutputFiles[0].Contents)
-
 	return bundledCode, nil
 }
 
