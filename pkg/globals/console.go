@@ -60,7 +60,6 @@ func Assert(info *v8.FunctionCallbackInfo) *v8.Value {
 	fmt.Println("console.assert is not implemented yet.")
 	return nil
 }
-
 func Clear(info *v8.FunctionCallbackInfo) *v8.Value {
 	args := make([]string, len(info.Args()))
 	for i, arg := range info.Args() {
@@ -165,7 +164,6 @@ var consoleFunctions = []struct {
 
 func CreateConsoleObject(iso *v8.Isolate) *v8.ObjectTemplate {
 	console := v8.NewObjectTemplate(iso)
-
 	for _, fn := range consoleFunctions {
 		console.Set(fn.name, v8.NewFunctionTemplate(iso, fn.fn))
 	}

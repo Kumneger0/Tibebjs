@@ -1,7 +1,5 @@
 module github.com/kumneger0/tibebjs
-
 go 1.23.1
-
 require rogchap.com/v8go v0.9.0
 
 require (

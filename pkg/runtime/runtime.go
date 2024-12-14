@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/evanw/esbuild/pkg/api"
+	timer "github.com/kumneger0/tibebjs/pkg/eventloop"
 	fileSystem "github.com/kumneger0/tibebjs/pkg/fs"
 	console "github.com/kumneger0/tibebjs/pkg/globals"
 	v8 "rogchap.com/v8go"
@@ -26,7 +27,7 @@ func TransformScript(entryFilePath string) (string, error) {
 		LogLevel:    api.LogLevelInfo,
 		Platform:    api.PlatformNode,
 		Target:      api.ESNext,
-			Plugins: []api.Plugin{
+		Plugins: []api.Plugin{
 			{
 				Name: "inject-dirname-filename",
 				Setup: func(build api.PluginBuild) {
@@ -73,37 +74,63 @@ func NewRuntime() (*Runtime, error) {
 	ctx := v8.NewContext(iso)
 	return &Runtime{Isolate: iso, Context: ctx}, nil
 }
-
 func (r *Runtime) SetupGlobals(scriptDir string) error {
 	global := r.Context.Global()
 
-	fileSystemApi, err := fileSystem.CreateFsObject(r.Isolate).NewInstance(r.Context)
+	proxyScript := `
+		(() => {
+			return new Proxy({}, {
+				get(target, prop) {
+					if (prop in target) {
+						return target[prop];
+					}
+					throw new Error("Property '" + String(prop) + "' does not exist");
+				}
+			});
+		})();
+	`
+
+	proxyValue, err := r.Context.RunScript(proxyScript, "proxy.js")
+	if err != nil {
+		return fmt.Errorf("error creating global proxy: %v", err)
+	}
+	err = global.Set("global", proxyValue)
 
 	if err != nil {
-		fmt.Println(err.Error())
+		return fmt.Errorf("error setting global proxy: %v", err)
 	}
-	global.Set("Tibeb", fileSystemApi)
+
+	for _, obj := range timer.GetTimerObjects() {
+		fnTemplate := v8.NewFunctionTemplate(r.Isolate, obj.Fn)
+		fn := fnTemplate.GetFunction(r.Context)
+		err = global.Set(obj.Name, fn)
+		if err != nil {
+			return fmt.Errorf("error setting %s: %v", obj.Name, err)
+		}
+	}
+
+	fileSystemApi, err := fileSystem.CreateFsObject(r.Isolate).NewInstance(r.Context)
+	if err != nil {
+		return fmt.Errorf("error creating filesystem API: %v", err)
+	}
+	err = global.Set("Tibeb", fileSystemApi)
+	if err != nil {
+		return fmt.Errorf("error setting Tibeb: %v", err)
+	}
 
 	consoleObj, err := console.CreateConsoleObject(r.Isolate).NewInstance(r.Context)
 	if err != nil {
-		return fmt.Errorf("error creating console instance: %v", err)
+		return fmt.Errorf("error creating console object: %v", err)
 	}
 	err = global.Set("console", consoleObj)
 	if err != nil {
 		return fmt.Errorf("error setting console object: %v", err)
 	}
 
-
-
 	return nil
 }
 
 func (r *Runtime) ExecuteScript(scriptPath string) (*v8.Value, error) {
-	_, err := os.ReadFile(scriptPath)
-	if err != nil {
-		return nil, fmt.Errorf("error reading script file: %v", err)
-	}
-
 	transformedScript, err := TransformScript(scriptPath)
 	if err != nil {
 		return nil, fmt.Errorf("error transforming script: %v", err)

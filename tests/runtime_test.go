@@ -1,7 +1,6 @@
 package runtime
 
 import "testing"
-
 func TestInitialize(t *testing.T) {
 	ctx := TestInitialize(t)
 	if ctx == nil {

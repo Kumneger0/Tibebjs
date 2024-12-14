@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
 	runtime "github.com/kumneger0/tibebjs/pkg/runtime"
 )
+
 
 func main() {
 	if err := run(); err != nil {
@@ -25,7 +25,6 @@ func run() error {
 		return err
 	}
 	defer rt.Dispose()
-
 	scriptDir := filepath.Dir(scriptPath)
 	if err := rt.SetupGlobals(scriptDir); err != nil {
 		return err
