@@ -5,9 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
+	mainEventloop "github.com/kumneger0/tibebjs/pkg"
 	runtime "github.com/kumneger0/tibebjs/pkg/runtime"
+	v8 "rogchap.com/v8go"
 )
-
 
 func main() {
 	if err := run(); err != nil {
@@ -25,6 +26,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
 	defer rt.Dispose()
 	scriptDir := filepath.Dir(scriptPath)
 	if err := rt.SetupGlobals(scriptDir); err != nil {
@@ -35,8 +37,18 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
-
-	return nil
+	mainEventloop.Wg.Wait()
+	for {
+		select {
+		case <-mainEventloop.Channel:
+			{
+				for _, task := range mainEventloop.Tasks {
+					task.Callback.Call(v8.Undefined(rt.Isolate))
+				}
+				mainEventloop.Tasks = make([]mainEventloop.Task, 0)
+			}
+		}
+	}
 }
 
 func getScriptPath() (string, error) {

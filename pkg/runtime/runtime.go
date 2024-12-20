@@ -17,6 +17,11 @@ type Runtime struct {
 	Context *v8.Context
 }
 
+type Task struct {
+	Callback *v8.Function
+	Context  *v8.Context
+}
+
 func TransformScript(entryFilePath string) (string, error) {
 	result := api.Build(api.BuildOptions{
 		EntryPoints: []string{entryFilePath},
