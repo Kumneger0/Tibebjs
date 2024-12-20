@@ -22,7 +22,7 @@ func TransformScript(entryFilePath string) (string, error) {
 		EntryPoints: []string{entryFilePath},
 		Bundle:      true,
 		Write:       false,
-		Format:      api.FormatIIFE,
+		Format:      api.FormatESModule,
 		GlobalName:  "global",
 		LogLevel:    api.LogLevelInfo,
 		Platform:    api.PlatformNode,
@@ -67,6 +67,7 @@ func TransformScript(entryFilePath string) (string, error) {
 
 func NewRuntime() (*Runtime, error) {
 	iso := v8.NewIsolate()
+
 	if iso == nil {
 		return nil, fmt.Errorf("failed to create isolate")
 	}
@@ -77,33 +78,10 @@ func NewRuntime() (*Runtime, error) {
 func (r *Runtime) SetupGlobals(scriptDir string) error {
 	global := r.Context.Global()
 
-	proxyScript := `
-		(() => {
-			return new Proxy({}, {
-				get(target, prop) {
-					if (prop in target) {
-						return target[prop];
-					}
-					throw new Error("Property '" + String(prop) + "' does not exist");
-				}
-			});
-		})();
-	`
-
-	proxyValue, err := r.Context.RunScript(proxyScript, "proxy.js")
-	if err != nil {
-		return fmt.Errorf("error creating global proxy: %v", err)
-	}
-	err = global.Set("global", proxyValue)
-
-	if err != nil {
-		return fmt.Errorf("error setting global proxy: %v", err)
-	}
-
 	for _, obj := range timer.GetTimerObjects() {
 		fnTemplate := v8.NewFunctionTemplate(r.Isolate, obj.Fn)
 		fn := fnTemplate.GetFunction(r.Context)
-		err = global.Set(obj.Name, fn)
+		err := global.Set(obj.Name, fn)
 		if err != nil {
 			return fmt.Errorf("error setting %s: %v", obj.Name, err)
 		}
