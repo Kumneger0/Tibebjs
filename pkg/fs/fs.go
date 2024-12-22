@@ -4,16 +4,14 @@ import (
 	"fmt"
 	"os"
 
+	eventloop "github.com/kumneger0/tibebjs/pkg/eventloop"
+
 	v8 "rogchap.com/v8go"
 )
-
-
-
 
 func ReadFile(info *v8.FunctionCallbackInfo) *v8.Value {
 	iso := info.Context().Isolate()
 	path := info.Args()[0].String()
-
 	fileContent, err := os.ReadFile(path)
 	if err != nil {
 		errMessage, _ := v8.NewValue(iso, err.Error())
@@ -29,11 +27,9 @@ func ReadFile(info *v8.FunctionCallbackInfo) *v8.Value {
 	return value
 }
 
-
 func WriteFile(info *v8.FunctionCallbackInfo) *v8.Value {
 	iso := info.Context().Isolate()
 	path := info.Args()[0].String()
-
 	var content []byte
 
 	if info.Args()[1].IsString() {
@@ -43,14 +39,14 @@ func WriteFile(info *v8.FunctionCallbackInfo) *v8.Value {
 
 		if obj.IsTypedArray() {
 			length, _ := obj.Get("length")
-			size := length.Int32() 
+			size := length.Int32()
 
 			content = make([]byte, size)
 
 			for i := int32(0); i < size; i++ {
-				indexStr := fmt.Sprintf("%d", i) 
-				val, _ := obj.Get(indexStr)      
-				content[i] = byte(val.Int32())  
+				indexStr := fmt.Sprintf("%d", i)
+				val, _ := obj.Get(indexStr)
+				content[i] = byte(val.Int32())
 			}
 		}
 	}
@@ -68,7 +64,18 @@ func WriteFile(info *v8.FunctionCallbackInfo) *v8.Value {
 	return value
 }
 
-
+func serve(info *v8.FunctionCallbackInfo) *v8.Value {
+	v8func, err := info.Args()[0].AsFunction()
+	if err != nil {
+		panic(err.Error())
+	}
+	eventloop.NetworkTaskQueue = append(eventloop.NetworkTaskQueue, eventloop.NetworkTask{
+		Callback: v8func,
+		Context:  info.Context(),
+	})
+	eventloop.Serve(info)
+	return v8.Undefined(info.Context().Isolate())
+}
 
 var fsFunctions = []struct {
 	name string
@@ -76,6 +83,7 @@ var fsFunctions = []struct {
 }{
 	{"readFile", ReadFile},
 	{"writeFile", WriteFile},
+	{"serve", serve},
 }
 
 func CreateFsObject(iso *v8.Isolate) *v8.ObjectTemplate {

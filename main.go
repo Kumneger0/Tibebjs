@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	runtime "github.com/kumneger0/tibebjs/pkg/runtime"
-)
 
+	eventloop "github.com/kumneger0/tibebjs/pkg/eventloop"
+	runtime "github.com/kumneger0/tibebjs/pkg/runtime"
+	v8 "rogchap.com/v8go"
+)
 
 func main() {
 	if err := run(); err != nil {
@@ -24,6 +26,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
 	defer rt.Dispose()
 	scriptDir := filepath.Dir(scriptPath)
 	if err := rt.SetupGlobals(scriptDir); err != nil {
@@ -34,8 +37,22 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
-
-	return nil
+	for {
+		select {
+		case task := <-eventloop.TimerTaskChannel:
+			{
+				task.Callback.Call(v8.Undefined(rt.Isolate))
+			}
+		case networkTask := <-eventloop.NetworkTaskChannel:
+			{
+				value, err := networkTask.Callback.Call(v8.Undefined(rt.Isolate), networkTask.FuncArg)
+				if err != nil {
+					panic(err.Error())
+				}
+				eventloop.NetworkTaskResponseChannel <- value
+			}
+		}
+	}
 }
 
 func getScriptPath() (string, error) {
