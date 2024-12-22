@@ -44,15 +44,7 @@ func ExteactResponse(res *v8.Value) ResponseType {
 		Headers:    headers.String(),
 	}
 }
-
-// type JSRequest struct {
-// 	Url     string
-// 	Method  string
-// 	Headers string
-// 	Body    string
-// }
-
-func MakeJSRequest(r *http.Request, info *v8.FunctionCallbackInfo) *v8.Value {
+func MakeJSRequestObj(r *http.Request, info *v8.FunctionCallbackInfo) *v8.Value {
 	url := r.URL.String()
 	method := r.Method
 	headers := r.Header

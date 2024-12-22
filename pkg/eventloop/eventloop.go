@@ -2,10 +2,12 @@ package eventloop
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -17,6 +19,7 @@ type TimerTask struct {
 	Callback *v8.Function
 	Context  *v8.Context
 	Id       int
+	Cleared  bool
 }
 
 type NetworkTask struct {
@@ -25,7 +28,11 @@ type NetworkTask struct {
 	FuncArg  *v8.Value
 }
 
-var TimerTaskQueue []TimerTask
+var (
+	Mu             sync.RWMutex
+	TimerTaskQueue []TimerTask
+)
+
 var TimerTaskChannel chan TimerTask
 
 var NetworkTaskQueue []NetworkTask
@@ -45,38 +52,77 @@ func init() {
 	}()
 }
 
-func Schedule(info *v8.FunctionCallbackInfo, interval bool) {
+func (t *TimerTask) Clear() {
+	Mu.Lock()
+	defer Mu.Unlock()
+	t.Cleared = true
+
+	for i, task := range TimerTaskQueue {
+		if task.Id == t.Id {
+			TimerTaskQueue = append(TimerTaskQueue[:i], TimerTaskQueue[i+1:]...)
+			break
+		}
+	}
+}
+
+func (t *TimerTask) IsCleared() bool {
+	Mu.RLock()
+	defer Mu.RUnlock()
+	return t.Cleared
+}
+
+func (t *TimerTask) Add() bool {
+	Mu.Lock()
+	defer Mu.Unlock()
+	TimerTaskQueue = append(TimerTaskQueue, *t)
+	return true
+}
+
+func GetTask(id int) (*TimerTask, error) {
+	var TimerTask *TimerTask
+	for _, task := range TimerTaskQueue {
+		if task.Id == id {
+			TimerTask = &task
+		}
+	}
+	if TimerTask == nil {
+		return nil, errors.New("task not found")
+	}
+	return TimerTask, nil
+}
+
+func Schedule(info *v8.FunctionCallbackInfo, interval bool, id int) {
 	var _ = make([]string, len(info.Args()))
 	callback := info.Args()[0]
 	if !callback.IsFunction() {
 		fmt.Println("the first argument must be function")
 		os.Exit(1)
 	}
-	v8Function, err := callback.AsFunction()
+	_, err := callback.AsFunction()
 	if err != nil {
 		fmt.Println("the first argument must be function")
 		os.Exit(1)
 	}
-
 	delay := info.Args()[1].Int32()
-
 	if !interval {
 		go func() {
 			time.Sleep(time.Duration(delay) * time.Millisecond)
-			TimerTaskChannel <- TimerTask{
-				Callback: v8Function,
-				Context:  info.Context(),
+			task, error := GetTask(id)
+			if error != nil || task.IsCleared() {
+				return
 			}
+			TimerTaskChannel <- *task
 			TimerTaskQueue = TimerTaskQueue[:len(TimerTaskQueue)-1]
 		}()
 	} else {
 		go func() {
 			for {
-				time.Sleep(time.Duration(delay) * time.Millisecond)
-				TimerTaskChannel <- TimerTask{
-					Callback: v8Function,
-					Context:  info.Context(),
+				task, error := GetTask(id)
+				if error != nil || task.IsCleared() {
+					return
 				}
+				time.Sleep(time.Duration(delay) * time.Millisecond)
+				TimerTaskChannel <- *task
 			}
 		}()
 	}
@@ -97,7 +143,7 @@ func Serve(info *v8.FunctionCallbackInfo) {
 	port := info.Args()[1].Int32()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		request := utils.MakeJSRequest(r, info)
+		request := utils.MakeJSRequestObj(r, info)
 
 		NetworkTaskChannel <- NetworkTask{
 			Callback: HandleFunc,
@@ -124,8 +170,6 @@ func Serve(info *v8.FunctionCallbackInfo) {
 		}
 		w.WriteHeader(status)
 		w.Header().Set("statusText", statusText)
-
-		w.Header().Set("Content-Type", "application/json")
 		_, err := w.Write([]byte(body))
 
 		if err != nil {
