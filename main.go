@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	mainEventloop "github.com/kumneger0/tibebjs/pkg"
+	eventloop "github.com/kumneger0/tibebjs/pkg/eventloop"
 	runtime "github.com/kumneger0/tibebjs/pkg/runtime"
 	v8 "rogchap.com/v8go"
 )
@@ -37,15 +37,19 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
-	mainEventloop.Wg.Wait()
 	for {
 		select {
-		case <-mainEventloop.Channel:
+		case task := <-eventloop.TimerTaskChannel:
 			{
-				for _, task := range mainEventloop.Tasks {
-					task.Callback.Call(v8.Undefined(rt.Isolate))
+				task.Callback.Call(v8.Undefined(rt.Isolate))
+			}
+		case networkTask := <-eventloop.NetworkTaskChannel:
+			{
+				value, err := networkTask.Callback.Call(v8.Undefined(rt.Isolate), networkTask.FuncArg)
+				if err != nil {
+					panic(err.Error())
 				}
-				mainEventloop.Tasks = make([]mainEventloop.Task, 0)
+				eventloop.NetworkTaskResponseChannel <- value
 			}
 		}
 	}

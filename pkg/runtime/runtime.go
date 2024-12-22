@@ -6,20 +6,16 @@ import (
 	"path/filepath"
 
 	"github.com/evanw/esbuild/pkg/api"
-	timer "github.com/kumneger0/tibebjs/pkg/eventloop"
 	fileSystem "github.com/kumneger0/tibebjs/pkg/fs"
 	console "github.com/kumneger0/tibebjs/pkg/globals"
+	net "github.com/kumneger0/tibebjs/pkg/net"
+	timer "github.com/kumneger0/tibebjs/pkg/timer"
 	v8 "rogchap.com/v8go"
 )
 
 type Runtime struct {
 	Isolate *v8.Isolate
 	Context *v8.Context
-}
-
-type Task struct {
-	Callback *v8.Function
-	Context  *v8.Context
 }
 
 func TransformScript(entryFilePath string) (string, error) {
@@ -92,6 +88,15 @@ func (r *Runtime) SetupGlobals(scriptDir string) error {
 		}
 	}
 
+	for _, obj := range net.NetFuncs {
+		fnTemplate := v8.NewFunctionTemplate(r.Isolate, obj.Fn)
+		fn := fnTemplate.GetFunction(r.Context)
+		err := global.Set(obj.Name, fn)
+		if err != nil {
+			return fmt.Errorf("error setting %s: %v", obj.Name, err)
+		}
+	}
+
 	fileSystemApi, err := fileSystem.CreateFsObject(r.Isolate).NewInstance(r.Context)
 	if err != nil {
 		return fmt.Errorf("error creating filesystem API: %v", err)
@@ -102,6 +107,7 @@ func (r *Runtime) SetupGlobals(scriptDir string) error {
 	}
 
 	consoleObj, err := console.CreateConsoleObject(r.Isolate).NewInstance(r.Context)
+
 	if err != nil {
 		return fmt.Errorf("error creating console object: %v", err)
 	}
