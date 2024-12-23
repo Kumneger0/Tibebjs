@@ -2,6 +2,8 @@ package timer
 
 import (
 	"fmt"
+	"math/rand"
+	"time"
 
 	eventloop "github.com/kumneger0/tibebjs/pkg/eventloop"
 	v8 "rogchap.com/v8go"
@@ -29,7 +31,6 @@ func setTimeout(info *v8.FunctionCallbackInfo) *v8.Value {
 }
 
 func clearTimeout(info *v8.FunctionCallbackInfo) *v8.Value {
-	fmt.Println("clearing timeout")
 	id := int(info.Args()[0].Int32())
 	task, err := eventloop.GetTask(id)
 	if err != nil {
@@ -58,7 +59,6 @@ func setInterval(info *v8.FunctionCallbackInfo) *v8.Value {
 }
 
 func clearInterval(info *v8.FunctionCallbackInfo) *v8.Value {
-	fmt.Println("clearing interval")
 	id := int(info.Args()[0].Int32())
 	task, err := eventloop.GetTask(id)
 	if err != nil {
@@ -68,6 +68,50 @@ func clearInterval(info *v8.FunctionCallbackInfo) *v8.Value {
 	return v8.Undefined(info.Context().Isolate())
 }
 
+func deleteFile(info *v8.FunctionCallbackInfo) *v8.Promise {
+	filename := info.Args()[0].String()
+
+	promiseResolver, err := v8.NewPromiseResolver(info.Context())
+	if err != nil {
+		fmt.Println("Error creating promise resolver:", err)
+		return nil
+	}
+
+	go func() {
+		if len(filename) == 0 {
+			errorValue, _ := v8.NewValue(info.Context().Isolate(), "Invalid filename")
+			promiseResolver.Reject(errorValue)
+			return
+		}
+
+		time.Sleep(1 * time.Second)
+
+		if rand.Intn(10) > 7 {
+			errorValue, err := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("Failed to delete file: %s", filename))
+			if err != nil {
+				fmt.Println("error creating error value", err.Error())
+			}
+			promiseResolver.Reject(errorValue)
+		} else {
+			successValue, err := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("File %s deleted successfully", filename))
+			if err != nil {
+				fmt.Println("error creating success value", err.Error())
+			}
+			promiseResolver.Resolve(successValue)
+		}
+	}()
+
+	return promiseResolver.GetPromise()
+}
+
+func deleteWrapper(info *v8.FunctionCallbackInfo) *v8.Value {
+	val := deleteFile(info)
+	value := val.Value
+	return value
+}
+
+
+
 var TimerFunctions = []struct {
 	Name string
 	Fn   func(*v8.FunctionCallbackInfo) *v8.Value
@@ -76,6 +120,7 @@ var TimerFunctions = []struct {
 	{"clearTimeout", clearTimeout},
 	{"setInterval", setInterval},
 	{"clearInterval", clearInterval},
+	{"deleteFile", deleteWrapper},
 }
 
 func GetTimerObjects() []struct {
