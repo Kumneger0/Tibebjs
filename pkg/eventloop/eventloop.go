@@ -193,3 +193,170 @@ func Serve(info *v8.FunctionCallbackInfo) {
 		}
 	}()
 }
+
+func ReadFile(info *v8.FunctionCallbackInfo) *v8.Promise {
+	path := info.Args()[0].String()
+	promiseResolver, err := v8.NewPromiseResolver(info.Context())
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil
+	}
+
+	go func() {
+		if len(path) == 0 {
+			errorValue, err := v8.NewValue(info.Context().Isolate(), "Invalid filename")
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Reject(errorValue)
+			return
+		}
+
+		fileContent, err := os.ReadFile(path)
+		if err != nil {
+			errorValue, err := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("Failed to read file: %s", path))
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Reject(errorValue)
+		} else {
+			successValue, err := v8.NewValue(info.Context().Isolate(), string(fileContent))
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Resolve(successValue)
+		}
+	}()
+
+	return promiseResolver.GetPromise()
+}
+
+func WriteFile(info *v8.FunctionCallbackInfo) *v8.Promise {
+	path := info.Args()[0].String()
+	var content []byte
+
+	if info.Args()[1].IsString() {
+		content = []byte(info.Args()[1].String())
+	}
+	promiseResolver, err := v8.NewPromiseResolver(info.Context())
+	if err != nil {
+		panic(err.Error())
+	}
+
+	go func() {
+		if len(path) == 0 {
+			errorValue, err := v8.NewValue(info.Context().Isolate(), "Invalid filename")
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Reject(errorValue)
+			return
+		}
+
+		err := os.WriteFile(path, content, 0644)
+		if err != nil {
+			errorValue, err := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("Failed to Write to file: %s", err.Error()))
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Reject(errorValue)
+		} else {
+			promiseResolver.Resolve(v8.Undefined(info.Context().Isolate()))
+		}
+	}()
+
+	return promiseResolver.GetPromise()
+}
+
+func RmFile(info *v8.FunctionCallbackInfo) *v8.Promise {
+	path := info.Args()[0].String()
+	promiseResolver, err := v8.NewPromiseResolver(info.Context())
+	if err != nil {
+		panic(err.Error())
+	}
+
+	go func() {
+		if len(path) == 0 {
+			errorValue, err := v8.NewValue(info.Context().Isolate(), "Invalid filename")
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Reject(errorValue)
+			return
+		}
+
+		err := os.Remove(path)
+		if err != nil {
+			errorValue, err := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("Failed to remove file: %s", err.Error()))
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Reject(errorValue)
+		} else {
+			promiseResolver.Resolve(v8.Undefined(info.Context().Isolate()))
+		}
+	}()
+
+	return promiseResolver.GetPromise()
+}
+
+func RenameFile(info *v8.FunctionCallbackInfo) *v8.Promise {
+	oldPath := info.Args()[0].String()
+	newPath := info.Args()[1].String()
+	promiseResolver, err := v8.NewPromiseResolver(info.Context())
+	if err != nil {
+		panic(err.Error())
+	}
+
+	go func() {
+		if len(oldPath) == 0 || len(newPath) == 0 {
+			errorValue, err := v8.NewValue(info.Context().Isolate(), "Invalid filename")
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Reject(errorValue)
+			return
+		}
+
+		err := os.Rename(oldPath, newPath)
+		if err != nil {
+			errorValue, err := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("Failed to rename file: %s", err.Error()))
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Reject(errorValue)
+		} else {
+			promiseResolver.Resolve(v8.Undefined(info.Context().Isolate()))
+		}
+	}()
+
+	return promiseResolver.GetPromise()
+}
+
+func Fetch(info *v8.FunctionCallbackInfo) *v8.Promise {
+	url := info.Args()[0].String()
+	promiseResolver, err := v8.NewPromiseResolver(info.Context())
+	if err != nil {
+		panic(err.Error())
+	}
+
+	go func() {
+		response, err := http.Get(url)
+		if err != nil {
+			errorValue, err := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("Failed to fetch: %s", err.Error()))
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Reject(errorValue)
+		} else {
+			value, err := v8.NewValue(info.Context().Isolate(), response)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Resolve(value)
+		}
+	}()
+
+	return promiseResolver.GetPromise()
+}
+

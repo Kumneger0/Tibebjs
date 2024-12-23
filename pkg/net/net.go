@@ -3,6 +3,7 @@ package net
 import (
 	"fmt"
 
+	"github.com/kumneger0/tibebjs/pkg/eventloop"
 	v8 "rogchap.com/v8go"
 )
 
@@ -68,4 +69,34 @@ var NetFuncs = []struct {
 		Name: "request",
 		Fn:   Request,
 	},
+}
+
+func Serve(info *v8.FunctionCallbackInfo) *v8.Value {
+	v8func, err := info.Args()[0].AsFunction()
+	if err != nil {
+		panic(err.Error())
+	}
+	eventloop.NetworkTaskQueue = append(eventloop.NetworkTaskQueue, eventloop.NetworkTask{
+		Callback: v8func,
+		Context:  info.Context(),
+	})
+	eventloop.Serve(info)
+	return v8.Undefined(info.Context().Isolate())
+}
+
+var NetObj = []struct{
+    Name string
+    Fn func(*v8.FunctionCallbackInfo) *v8.Value
+}{
+    {
+        Name: "serve",
+        Fn:   Serve,
+    },
+}
+
+func GetNetObjects() []struct{
+    Name string
+    Fn func(*v8.FunctionCallbackInfo) *v8.Value
+}{
+    return NetObj
 }

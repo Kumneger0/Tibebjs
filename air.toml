@@ -1,13 +1,13 @@
 [project]
-name = "jsruntime"
+name = "tibeb"
 version = "0.1.0"
 
 [build]
-command = "go build -o jsruntime cmd/main.go"
+command = "go build -o tibeb cmd/main.go"
 output_dir = "./bin"
 
 [run]
-command = "jsruntime"
+command = "tibeb"
 args = ["--v8"]
 
 [watch]
