@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/evanw/esbuild/pkg/api"
-	fileSystem "github.com/kumneger0/tibebjs/pkg/fs"
-	console "github.com/kumneger0/tibebjs/pkg/globals"
+	globals "github.com/kumneger0/tibebjs/globals"
+	console "github.com/kumneger0/tibebjs/pkg/console"
 	net "github.com/kumneger0/tibebjs/pkg/net"
 	timer "github.com/kumneger0/tibebjs/pkg/timer"
 	v8 "rogchap.com/v8go"
@@ -96,12 +96,12 @@ func (r *Runtime) SetupGlobals(scriptDir string) error {
 			return fmt.Errorf("error setting %s: %v", obj.Name, err)
 		}
 	}
-
-	fileSystemApi, err := fileSystem.CreateFsObject(r.Isolate).NewInstance(r.Context)
-	if err != nil {
-		return fmt.Errorf("error creating filesystem API: %v", err)
-	}
-	err = global.Set("Tibeb", fileSystemApi)
+     globalsUnderTibebNameSpace := globals.SetGlobalsUnderTibebNameSpace(r.Isolate)
+	 globalsUnderTibebNameSpaceObj, err := globalsUnderTibebNameSpace.NewInstance(r.Context)
+	 if err != nil {
+		 return fmt.Errorf("error creating globals under Tibeb namespace: %v", err)
+	 }	
+	err = global.Set("Tibeb", globalsUnderTibebNameSpaceObj)
 	if err != nil {
 		return fmt.Errorf("error setting Tibeb: %v", err)
 	}
