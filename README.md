@@ -23,6 +23,19 @@ A JavaScript runtime experiment inspired by [Roll your own JavaScript runtime](h
 
 > Note: Windows is not supported as v8go [dropped Windows support](https://github.com/rogchap/v8go/pull/234)
 
+## Getting Started
+
+1. Clone the repository:
+```bash
+git clone https://github.com/Kumneger0/Tibebjs.git
+cd Tibebjs
+```
+
+2. Install dependencies:
+```bash
+go mod download
+```
+
 ## Building
 
 ### On Linux
