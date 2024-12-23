@@ -268,7 +268,6 @@ func WriteFile(info *v8.FunctionCallbackInfo) *v8.Promise {
 	return promiseResolver.GetPromise()
 }
 
-
 func RmFile(info *v8.FunctionCallbackInfo) *v8.Promise {
 	path := info.Args()[0].String()
 	promiseResolver, err := v8.NewPromiseResolver(info.Context())
@@ -300,7 +299,6 @@ func RmFile(info *v8.FunctionCallbackInfo) *v8.Promise {
 
 	return promiseResolver.GetPromise()
 }
-
 
 func RenameFile(info *v8.FunctionCallbackInfo) *v8.Promise {
 	oldPath := info.Args()[0].String()
@@ -334,3 +332,31 @@ func RenameFile(info *v8.FunctionCallbackInfo) *v8.Promise {
 
 	return promiseResolver.GetPromise()
 }
+
+func Fetch(info *v8.FunctionCallbackInfo) *v8.Promise {
+	url := info.Args()[0].String()
+	promiseResolver, err := v8.NewPromiseResolver(info.Context())
+	if err != nil {
+		panic(err.Error())
+	}
+
+	go func() {
+		response, err := http.Get(url)
+		if err != nil {
+			errorValue, err := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("Failed to fetch: %s", err.Error()))
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Reject(errorValue)
+		} else {
+			value, err := v8.NewValue(info.Context().Isolate(), response)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			promiseResolver.Resolve(value)
+		}
+	}()
+
+	return promiseResolver.GetPromise()
+}
+

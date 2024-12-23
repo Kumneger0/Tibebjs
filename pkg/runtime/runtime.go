@@ -78,7 +78,6 @@ func NewRuntime() (*Runtime, error) {
 }
 func (r *Runtime) SetupGlobals(scriptDir string) error {
 	global := r.Context.Global()
-
 	for _, obj := range timer.GetTimerObjects() {
 		fnTemplate := v8.NewFunctionTemplate(r.Isolate, obj.Fn)
 		fn := fnTemplate.GetFunction(r.Context)
@@ -96,11 +95,11 @@ func (r *Runtime) SetupGlobals(scriptDir string) error {
 			return fmt.Errorf("error setting %s: %v", obj.Name, err)
 		}
 	}
-     globalsUnderTibebNameSpace := globals.SetGlobalsUnderTibebNameSpace(r.Isolate)
-	 globalsUnderTibebNameSpaceObj, err := globalsUnderTibebNameSpace.NewInstance(r.Context)
-	 if err != nil {
-		 return fmt.Errorf("error creating globals under Tibeb namespace: %v", err)
-	 }	
+	globalsUnderTibebNameSpace := globals.SetGlobalsUnderTibebNameSpace(r.Isolate)
+	globalsUnderTibebNameSpaceObj, err := globalsUnderTibebNameSpace.NewInstance(r.Context)
+	if err != nil {
+		return fmt.Errorf("error creating globals under Tibeb namespace: %v", err)
+	}
 	err = global.Set("Tibeb", globalsUnderTibebNameSpaceObj)
 	if err != nil {
 		return fmt.Errorf("error setting Tibeb: %v", err)

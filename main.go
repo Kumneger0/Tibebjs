@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -33,10 +34,28 @@ func run() error {
 		return err
 	}
 
-	_, err = rt.ExecuteScript(scriptPath)
+	result, err := rt.ExecuteScript(scriptPath)
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
+
+	promise, err := result.AsPromise()
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
+	result = promise.Result()
+	if !result.IsNullOrUndefined() {
+		jsError := v8.JSError{
+			Message:    result.String(),
+			StackTrace: scriptPath,
+		}
+
+		log.Fatalf("\n %s\n Stack Trace: %s\n",
+			jsError.Message,
+			jsError.StackTrace,
+		)
+	}
+
 	for {
 		select {
 		case task := <-eventloop.TimerTaskChannel:
