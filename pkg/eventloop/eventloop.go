@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -43,13 +44,6 @@ func init() {
 	TimerTaskChannel = make(chan TimerTask, 100)
 	NetworkTaskChannel = make(chan NetworkTask, 100)
 	NetworkTaskResponseChannel = make(chan *v8.Value, 100)
-	go func() {
-		for {
-			if len(TimerTaskQueue) == 0 {
-				return
-			}
-		}
-	}()
 }
 
 func (t *TimerTask) Clear() {
@@ -335,28 +329,113 @@ func RenameFile(info *v8.FunctionCallbackInfo) *v8.Promise {
 
 func Fetch(info *v8.FunctionCallbackInfo) *v8.Promise {
 	url := info.Args()[0].String()
+	fmt.Printf("Fetching URL: %s\n", url)
+
 	promiseResolver, err := v8.NewPromiseResolver(info.Context())
 	if err != nil {
+		fmt.Printf("Error creating promise resolver: %v\n", err)
 		panic(err.Error())
 	}
 
+	jsonPromiseResolver, _ := v8.NewPromiseResolver(info.Context())
+
 	go func() {
+		fmt.Printf("Starting HTTP GET request to: %s\n", url)
 		response, err := http.Get(url)
 		if err != nil {
+			fmt.Printf("HTTP GET error: %v\n", err)
 			errorValue, err := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("Failed to fetch: %s", err.Error()))
 			if err != nil {
-				fmt.Println(err.Error())
+				fmt.Printf("Error creating error value: %v\n", err)
 			}
 			promiseResolver.Reject(errorValue)
 		} else {
-			value, err := v8.NewValue(info.Context().Isolate(), response)
+			defer response.Body.Close()
+			fmt.Printf("Response status: %s\n", response.Status)
+
+			responseObj := v8.NewObjectTemplate(info.Context().Isolate())
+
+			jsonFn := v8.NewFunctionTemplate(info.Context().Isolate(), func(info *v8.FunctionCallbackInfo) *v8.Value {
+				fmt.Println("json() method called")
+				body, err := io.ReadAll(response.Body)
+				if err != nil {
+					fmt.Printf("Error reading body: %v\n", err)
+					errValue, _ := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("Failed to read body: %s", err.Error()))
+					jsonPromiseResolver.Reject(errValue)
+					return jsonPromiseResolver.GetPromise().Value
+				}
+
+				// fmt.Printf("Response body: %s\n", string(body))
+
+				var result interface{}
+				if err := json.Unmarshal(body, &result); err != nil {
+					fmt.Printf("JSON parse error: %v\n", err)
+					errValue, _ := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("Failed to parse JSON: %s", err.Error()))
+					jsonPromiseResolver.Reject(errValue)
+					return jsonPromiseResolver.GetPromise().Value
+				}
+
+				fmt.Printf("Parsed JSON result: %+v\n", result)
+
+				jsonValue, err := utils.GoValueToV8(info.Context().Isolate(), result, info.Context())
+				if err != nil {
+					fmt.Printf("JSON conversion error: %v\n", err)
+					errValue, _ := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("Failed to convert JSON: %s", err.Error()))
+					jsonPromiseResolver.Reject(errValue)
+					return jsonPromiseResolver.GetPromise().Value
+				}
+
+				fmt.Printf("Successfully converted to V8 value\n")
+				jsonPromiseResolver.Resolve(jsonValue)
+				return jsonPromiseResolver.GetPromise().Value
+			})
+
+			textFn := v8.NewFunctionTemplate(info.Context().Isolate(), func(info *v8.FunctionCallbackInfo) *v8.Value {
+				return text(info, response)
+			})
+
+			err = responseObj.Set("json", jsonFn)
 			if err != nil {
-				fmt.Println(err.Error())
+				fmt.Printf("Error setting json method on template: %v\n", err)
 			}
-			promiseResolver.Resolve(value)
+
+			err = responseObj.Set("text", textFn)
+
+			if err != nil {
+				fmt.Println("Error", err.Error())
+			}
+
+			resInstance, err := responseObj.NewInstance(info.Context())
+			if err != nil {
+				fmt.Printf("Error creating response instance: %v\n", err)
+			}
+
+			fmt.Println("Resolving main promise with response object")
+			promiseResolver.Resolve(resInstance.Value)
 		}
 	}()
 
 	return promiseResolver.GetPromise()
 }
 
+func text(info *v8.FunctionCallbackInfo, response *http.Response) *v8.Value {
+	textPromiseResolver, err := v8.NewPromiseResolver(info.Context())
+	if err != nil {
+		panic(err.Error())
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		fmt.Printf("Error reading body: %v\n", err)
+		errValue, _ := v8.NewValue(info.Context().Isolate(), fmt.Sprintf("Failed to read body: %s", err.Error()))
+		textPromiseResolver.Reject(errValue)
+		return textPromiseResolver.GetPromise().Value
+	}
+
+	text, err := v8.NewValue(info.Context().Isolate(), string(body))
+	if err != nil {
+		panic(err.Error())
+	}
+
+	textPromiseResolver.Resolve(text)
+	return textPromiseResolver.GetPromise().Value
+}

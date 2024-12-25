@@ -8,6 +8,7 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 	globals "github.com/kumneger0/tibebjs/globals"
 	console "github.com/kumneger0/tibebjs/pkg/console"
+	fetch "github.com/kumneger0/tibebjs/pkg/fetch"
 	net "github.com/kumneger0/tibebjs/pkg/net"
 	timer "github.com/kumneger0/tibebjs/pkg/timer"
 	v8 "rogchap.com/v8go"
@@ -113,6 +114,11 @@ func (r *Runtime) SetupGlobals(scriptDir string) error {
 	err = global.Set("console", consoleObj)
 	if err != nil {
 		return fmt.Errorf("error setting console object: %v", err)
+	}
+
+	errs := global.Set("fetch", v8.NewFunctionTemplate(r.Isolate,  fetch.Fetch).GetFunction(r.Context));
+	if errs != nil {
+        return fmt.Errorf("failed setting fetch %v", errs)
 	}
 
 	return nil

@@ -77,3 +77,50 @@ func MakeJSRequestObj(r *http.Request, info *v8.FunctionCallbackInfo) *v8.Value 
 	}
 	return requestIntanace.Value
 }
+
+
+
+func GoValueToV8(isolate *v8.Isolate, value interface{}, ctx *v8.Context) (*v8.Value, error) {
+    switch v := value.(type) {
+    case string:
+        return v8.NewValue(isolate, v)
+    case float64:
+        return v8.NewValue(isolate, v)
+    case bool:
+        return v8.NewValue(isolate, v)
+    case []interface{}:
+        arrayTmpl := v8.NewObjectTemplate(isolate)
+        array, err := arrayTmpl.NewInstance(ctx)
+        if err != nil {
+            return nil, err
+        }
+        // Set array length
+        array.Set("length", len(v))
+        for i, item := range v {
+            itemValue, err := GoValueToV8(isolate, item, ctx)
+            if err != nil {
+                return nil, err
+            }
+            array.Set(fmt.Sprint(i), itemValue)
+        }
+        return array.Value, nil
+    case map[string]interface{}:
+        obj := v8.NewObjectTemplate(isolate)
+        instance, err := obj.NewInstance(ctx)
+        if err != nil {
+            return nil, err
+        }
+        for key, item := range v {
+            itemValue, err := GoValueToV8(isolate, item, ctx)
+            if err != nil {
+                return nil, err
+            }
+            instance.Set(key, itemValue)
+        }
+        return instance.Value, nil
+    case nil:
+        return v8.Null(isolate), nil
+    default:
+        return nil, fmt.Errorf("unsupported type: %T", value)
+    }
+}

@@ -12,13 +12,13 @@ A JavaScript runtime experiment inspired by [Roll your own JavaScript runtime](h
 
 - JavaScript runtime built on V8 engine
 - File system operations
-- Promise support
+- Built-in HTTP server
 - Console API implementation
 - Timer functions (setTimeout, setInterval)
 
 ## Prerequisites
 
-- Go 1.21 or higher
+- Go 1.23 or higher
 - GCC (for v8go compilation)
 
 > Note: Windows is not supported as v8go [dropped Windows support](https://github.com/rogchap/v8go/pull/234)
@@ -70,8 +70,6 @@ Execute JavaScript files:
   - `utils/`: Utility functions
 - `js/`: JavaScript example files
 - `globals/`: Global objects and bindings
-- `cmd/`: Command-line interface
-- `scripts/`: Build and utility scripts
 
 ## Available APIs
 
@@ -88,29 +86,6 @@ await Tibeb.rmFile('file.txt');
 
 // Rename file
 await Tibeb.renameFile('old.txt', 'new.txt');
-```
-
-### Timers
-```javascript
-// setTimeout and clearTimeout
-const timeoutId = setTimeout(() => {
-    console.log('Delayed message');
-}, 1000);
-clearTimeout(timeoutId);
-
-// setInterval and clearInterval
-const intervalId = setInterval(() => {
-    console.log('Repeated message');
-}, 1000);
-clearInterval(intervalId);
-```
-
-### Console API
-```javascript
-console.log('Hello, world!');
-console.info('Info message');
-console.warn('Warning message');
-console.error('Error message');
 ```
 
 ### HTTP Server
