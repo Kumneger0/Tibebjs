@@ -71,7 +71,7 @@ Execute JavaScript files:
 - `js/`: JavaScript example files
 - `globals/`: Global objects and bindings
 
-## Available APIs
+## Examples
 
 ### File System Operations
 ```javascript
