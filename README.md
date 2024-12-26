@@ -68,7 +68,6 @@ Execute JavaScript files:
   - `fs/`: File system operations
   - `fetch/`: HTTP client implementation
   - `utils/`: Utility functions
-- `js/`: JavaScript example files
 - `globals/`: Global objects and bindings
 
 ## Examples
