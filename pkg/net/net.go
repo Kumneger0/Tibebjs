@@ -2,6 +2,7 @@ package net
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/kumneger0/tibebjs/pkg/eventloop"
 	v8 "rogchap.com/v8go"
@@ -10,8 +11,6 @@ import (
 type TibebRequest struct {
 	Url string
 }
-
-
 
 type TibebResponse struct {
 	Status     int
@@ -78,27 +77,30 @@ func Serve(info *v8.FunctionCallbackInfo) *v8.Value {
 	if err != nil {
 		panic(err.Error())
 	}
-	eventloop.NetworkTaskQueue = append(eventloop.NetworkTaskQueue, eventloop.NetworkTask{
+
+	netTask := eventloop.NetworkTask{
 		Callback: v8func,
 		Context:  info.Context(),
-	})
-	eventloop.Serve(info)
+		Id:       rand.Int(),
+	}
+	eventloop.NetworkTaskQueue = append(eventloop.NetworkTaskQueue, netTask)
+	eventloop.Serve(info, &netTask)
 	return v8.Undefined(info.Context().Isolate())
 }
 
-var NetObj = []struct{
-    Name string
-    Fn func(*v8.FunctionCallbackInfo) *v8.Value
+var NetObj = []struct {
+	Name string
+	Fn   func(*v8.FunctionCallbackInfo) *v8.Value
 }{
-    {
-        Name: "serve",
-        Fn:   Serve,
-    },
+	{
+		Name: "serve",
+		Fn:   Serve,
+	},
 }
 
-func GetNetObjects() []struct{
-    Name string
-    Fn func(*v8.FunctionCallbackInfo) *v8.Value
-}{
-    return NetObj
+func GetNetObjects() []struct {
+	Name string
+	Fn   func(*v8.FunctionCallbackInfo) *v8.Value
+} {
+	return NetObj
 }

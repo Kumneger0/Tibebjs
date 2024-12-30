@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A JavaScript runtime experiment inspired by [Roll your own JavaScript runtime](https://deno.com/blog/roll-your-own-javascript-runtime). This is just an experiment how JavaScript runtimes work and is not intended for production use.
+A JavaScript runtime experiment inspired by [Roll your own JavaScript runtime](https://deno.com/blog/roll-your-own-javascript-runtime) - (which is in Rust). This is just an experiment how JavaScript runtimes work and is not intended for production use.
 
 </div>
 
@@ -142,7 +142,7 @@ Tibeb.serve((request) => {
 
 ## Resources
 
-- [Roll your own JavaScript runtime](https://deno.com/blog/roll-your-own-javascript-runtime) - Original Deno blog post
+- [Roll your own JavaScript runtime](https://deno.com/blog/roll-your-own-javascript-runtime) - Original Deno blog post (which is in Rust)
 - [v8go Documentation](https://pkg.go.dev/rogchap.com/v8go) - Go V8 bindings documentation
 
 ## Contributing

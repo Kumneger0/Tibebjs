@@ -61,6 +61,10 @@ func run() error {
 		case task := <-eventloop.TimerTaskChannel:
 			{
 				task.Callback.Call(v8.Undefined(rt.Isolate))
+				isTaskEmpty := IsTasksEmpty()
+				if isTaskEmpty {
+					return nil
+				}
 			}
 		case networkTask := <-eventloop.NetworkTaskChannel:
 			{
@@ -70,13 +74,38 @@ func run() error {
 				}
 				eventloop.NetworkTaskResponseChannel <- value
 			}
+		case <-eventloop.IocommunicationChannel:
+			{
+				isTaskEmpty := IsTasksEmpty()
+				if isTaskEmpty {
+					return nil
+				}
+			}
+		case signal := <-eventloop.ShutDownChannel:
+			{
+
+				fmt.Println("signal", signal)
+				os.Exit(0)
+			}
+		default:
+			{
+				isTaskEmpty := IsTasksEmpty()
+				if isTaskEmpty {
+					return nil
+				}
+			}
 		}
 	}
+
 }
 
 func getScriptPath() (string, error) {
 	if len(os.Args) < 2 {
-		return "", fmt.Errorf("usage: go run main.go <path_to_script>")
+		return "", fmt.Errorf("tibebjs <path_to_script>")
 	}
 	return os.Args[1], nil
+}
+
+func IsTasksEmpty() bool {
+	return len(eventloop.IoTask) == 0 && len(eventloop.TimerTaskQueue) == 0 && len(eventloop.NetworkTaskQueue) == 0
 }

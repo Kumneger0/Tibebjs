@@ -26,20 +26,33 @@ type NetworkTask struct {
 	Callback *v8.Function
 	Context  *v8.Context
 	FuncArg  *v8.Value
+	Id       int
 }
+
+type IOTask struct {
+	Callback *v8.Function
+	Context  *v8.Context
+	Id       int
+}
+
+var IocommunicationChannel chan []IOTask
 
 var (
 	Mu             sync.RWMutex
 	TimerTaskQueue []TimerTask
+	IoTask         []IOTask
 )
 
 var TimerTaskChannel chan TimerTask
+var ShutDownChannel chan os.Signal
 
 var NetworkTaskQueue []NetworkTask
 var NetworkTaskChannel chan NetworkTask
 var NetworkTaskResponseChannel chan *v8.Value
 
 func init() {
+	ShutDownChannel = make(chan os.Signal, 1)
+	signal.Notify(ShutDownChannel, os.Interrupt, syscall.SIGTERM)
 	TimerTaskChannel = make(chan TimerTask, 100)
 	NetworkTaskChannel = make(chan NetworkTask, 100)
 	NetworkTaskResponseChannel = make(chan *v8.Value, 100)
@@ -84,6 +97,14 @@ func GetTask(id int) (*TimerTask, error) {
 	return TimerTask, nil
 }
 
+func (netTask *NetworkTask) remove() {
+	for i, task := range NetworkTaskQueue {
+		if task.Id == netTask.Id {
+			NetworkTaskQueue = append(NetworkTaskQueue[:i], NetworkTaskQueue...)
+		}
+	}
+}
+
 func Schedule(info *v8.FunctionCallbackInfo, interval bool, id int) {
 	var _ = make([]string, len(info.Args()))
 	callback := info.Args()[0]
@@ -121,7 +142,7 @@ func Schedule(info *v8.FunctionCallbackInfo, interval bool, id int) {
 	}
 }
 
-func Serve(info *v8.FunctionCallbackInfo) {
+func Serve(info *v8.FunctionCallbackInfo, netTask *NetworkTask) {
 	if len(info.Args()) < 2 {
 		panic("serve requires at least 2 arguments")
 	}
@@ -174,8 +195,6 @@ func Serve(info *v8.FunctionCallbackInfo) {
 		Handler: mux,
 	}
 
-	shutdownChan := make(chan os.Signal, 1)
-	signal.Notify(shutdownChan, os.Interrupt, syscall.SIGTERM)
 	serverReady := make(chan struct{})
 
 	go func() {
@@ -184,10 +203,19 @@ func Serve(info *v8.FunctionCallbackInfo) {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			fmt.Printf("Server error: %v\n", err.Error())
 		}
+		netTask.remove()
 	}()
 }
 
-func ReadFile(info *v8.FunctionCallbackInfo) *v8.Promise {
+func (task *IOTask) Remove() {
+	for i, tas := range IoTask {
+		if tas.Id == task.Id {
+			IoTask = append(IoTask[:i], IoTask[i+1:]...)
+		}
+	}
+}
+
+func ReadFile(info *v8.FunctionCallbackInfo, task *IOTask) *v8.Promise {
 	path := info.Args()[0].String()
 	promiseResolver, err := v8.NewPromiseResolver(info.Context())
 	if err != nil {
@@ -219,12 +247,14 @@ func ReadFile(info *v8.FunctionCallbackInfo) *v8.Promise {
 			}
 			promiseResolver.Resolve(successValue)
 		}
+		task.Remove()
+		IocommunicationChannel <- IoTask
 	}()
 
 	return promiseResolver.GetPromise()
 }
 
-func WriteFile(info *v8.FunctionCallbackInfo) *v8.Promise {
+func WriteFile(info *v8.FunctionCallbackInfo, task *IOTask) *v8.Promise {
 	path := info.Args()[0].String()
 	var content []byte
 
@@ -256,12 +286,14 @@ func WriteFile(info *v8.FunctionCallbackInfo) *v8.Promise {
 		} else {
 			promiseResolver.Resolve(v8.Undefined(info.Context().Isolate()))
 		}
+		task.Remove()
+		IocommunicationChannel <- IoTask
 	}()
 
 	return promiseResolver.GetPromise()
 }
 
-func RmFile(info *v8.FunctionCallbackInfo) *v8.Promise {
+func RmFile(info *v8.FunctionCallbackInfo, task *IOTask) *v8.Promise {
 	path := info.Args()[0].String()
 	promiseResolver, err := v8.NewPromiseResolver(info.Context())
 	if err != nil {
@@ -288,12 +320,14 @@ func RmFile(info *v8.FunctionCallbackInfo) *v8.Promise {
 		} else {
 			promiseResolver.Resolve(v8.Undefined(info.Context().Isolate()))
 		}
+		task.Remove()
+		IocommunicationChannel <- IoTask
 	}()
 
 	return promiseResolver.GetPromise()
 }
 
-func RenameFile(info *v8.FunctionCallbackInfo) *v8.Promise {
+func RenameFile(info *v8.FunctionCallbackInfo, task *IOTask) *v8.Promise {
 	oldPath := info.Args()[0].String()
 	newPath := info.Args()[1].String()
 	promiseResolver, err := v8.NewPromiseResolver(info.Context())
@@ -321,12 +355,15 @@ func RenameFile(info *v8.FunctionCallbackInfo) *v8.Promise {
 		} else {
 			promiseResolver.Resolve(v8.Undefined(info.Context().Isolate()))
 		}
+		task.Remove()
+		IocommunicationChannel <- IoTask
+
 	}()
 
 	return promiseResolver.GetPromise()
 }
 
-func Fetch(info *v8.FunctionCallbackInfo) *v8.Promise {
+func Fetch(info *v8.FunctionCallbackInfo, netTask *NetworkTask) *v8.Promise {
 	url := info.Args()[0].String()
 	fmt.Printf("Fetching URL: %s\n", url)
 
@@ -371,7 +408,7 @@ func Fetch(info *v8.FunctionCallbackInfo) *v8.Promise {
 			if err != nil {
 				fmt.Println(err.Error())
 			}
- 
+
 			responseObj.Set("status", resStatus)
 
 			err = responseObj.Set("text", textFn)
@@ -388,6 +425,7 @@ func Fetch(info *v8.FunctionCallbackInfo) *v8.Promise {
 			fmt.Println("Resolving main promise with response object")
 			promiseResolver.Resolve(resInstance.Value)
 		}
+		netTask.remove()
 	}()
 
 	return promiseResolver.GetPromise()

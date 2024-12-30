@@ -159,8 +159,6 @@ func Text(info *v8.FunctionCallbackInfo, response *http.Response) *v8.Value {
 					return jsonPromiseResolver.GetPromise().Value
 				}
 
-				// fmt.Printf("Response body: %s\n", string(body))
-
 				var result interface{}
 				if err := json.Unmarshal(body, &result); err != nil {
 					fmt.Printf("JSON parse error: %v\n", err)
@@ -183,3 +181,7 @@ func Text(info *v8.FunctionCallbackInfo, response *http.Response) *v8.Value {
 				jsonPromiseResolver.Resolve(jsonValue)
 				return jsonPromiseResolver.GetPromise().Value
 			}
+
+
+
+
